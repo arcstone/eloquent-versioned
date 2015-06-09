@@ -139,7 +139,6 @@ trait Versioned
                     $newVersion->{static::getVersionColumn()} = static::getNextVersion($this->{static::getModelIdColumn()});
                     $newVersion->{static::getIsCurrentVersionColumn()} = 1;
                     $newVersion->updated_at = $this->freshTimestamp();
-                    $newVersion->previous_id = $this->getAttributeFromArray('id');
 
                     // trigger the update event
                     if ($this->fireModelEvent('updating') === false) {
@@ -167,7 +166,6 @@ trait Versioned
                                 $this->attributes[$this->primaryKey])
                             ->update([
                                 static::getIsCurrentVersionColumn() => 0,
-                                'next_id' => $this->getAttributeFromArray('id'),
                             ]);
 
                         $this->fireModelEvent('updated', false);
@@ -345,7 +343,14 @@ trait Versioned
      */
     public function getPreviousModel()
     {
-        return $this->withOldVersions()->where('id', $this->previous_id)->first();
+        if ($this->version === 1) {
+            return null;
+        }
+
+        return $this->withOldVersions()
+            ->where('model_id', $this->model_id)
+            ->where('version', ($this->version - 1))
+            ->first();
     }
 
     /**
@@ -353,6 +358,13 @@ trait Versioned
      */
     public function getNextModel()
     {
-        return $this->withOldVersions()->where('id', $this->next_id)->first();
+        if ($this->is_current_version === true) {
+            return null;
+        }
+
+        return $this->withOldVersions()
+            ->where('model_id', $this->model_id)
+            ->where('version', ($this->version + 1))
+            ->first();
     }
 }
