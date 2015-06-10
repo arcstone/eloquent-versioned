@@ -71,5 +71,15 @@ class FunctionalTestCase extends TestCase
             $table->string('name');
             $table->timestamps();
         });
+
+        DBM::schema()->create('bars', function ($table) {
+            $table->increments('id');
+            $table->integer('model_id')->unsigned()->default(1);
+            $table->integer('version')->unsigned()->default(1);
+            $table->integer('is_current_version')->unsigned()->default(1);
+            $table->string('name');
+            $table->string('title');
+            $table->timestamps();
+        });
     }
 }

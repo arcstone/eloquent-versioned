@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 trait Versioned
 {
 
+    protected $minorAttributes = [];
+
     protected $isVersioned = true;
 
     protected $hideVersioned = [
@@ -111,6 +113,10 @@ trait Versioned
      */
     public function save(array $options = array())
     {
+        if ($this->exists && $this->onlyHasMinorEdits()) {
+            return $this->saveMinor($options);
+        }
+
         $query = $this->newQueryWithoutScopes();
 
         $db = $this->getConnection();
@@ -369,5 +375,18 @@ trait Versioned
             ->where('model_id', $this->model_id)
             ->where('version', ($this->version + 1))
             ->first();
+    }
+
+    public function onlyHasMinorEdits()
+    {
+        $changedAttributes = $this->getDirty();
+
+        foreach ($changedAttributes as $key => $value) {
+            if (!in_array($key, $this->minorAttributes)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
