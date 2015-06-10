@@ -1,5 +1,8 @@
 <?php namespace EloquentVersioned\Tests;
 
+use EloquentVersioned\Exceptions\IncompatibleModelMismatchException;
+use EloquentVersioned\Tests\Models\UnusedModel;
+use EloquentVersioned\VersionDiffer;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 
 class VersionedTest extends FunctionalTestCase
@@ -188,6 +191,38 @@ class VersionedTest extends FunctionalTestCase
         // was the model updated with a major edit?
         $this->assertEquals($newTitle, $model->title);
         $this->assertEquals(2, $model->version);
+    }
+
+    /**
+     * Using saveMinor() should not create a new version
+     *
+     * @param  array $data
+     *
+     * @dataProvider createDataProvider
+     */
+    public function testVersionDifferences($data)
+    {
+        $className = $this->modelPrefix . $data['name'];
+        $model = $className::create($data)->fresh();
+
+        $model->name = 'Updated ' . $data['name'];
+        $model->save();
+
+        $originalModel = $className::onlyOldVersions()->find(1);
+
+        $changes = (new VersionDiffer)->diff($originalModel, $model);
+
+        $this->assertArraySubset(
+            [
+                'name' => [
+                    0 => $data['name'],
+                    1 => 'Updated ' . $data['name'],
+                    'left' => $data['name'],
+                    'right' => 'Updated ' . $data['name'],
+                ],
+            ],
+            $changes
+        );
     }
 
     /**
