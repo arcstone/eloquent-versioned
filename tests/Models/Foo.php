@@ -16,7 +16,8 @@ class Foo extends BaseVersionedModel
         parent::boot();
 
         static::creating(function ($model) {
-            if (!array_key_exists($model->primaryKey, $model->attributes)) {
+            if (!array_key_exists($model->primaryKey, $model->attributes) ||
+                ($model->attributes[$model->primaryKey] === null)) {
                 $model->attributes[$model->primaryKey] = $model->generateNewId();
             }
         });
