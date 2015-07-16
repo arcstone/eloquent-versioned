@@ -44,7 +44,8 @@ class NonIncrementingVersionedTest extends FunctionalTestCase
 
         // model exists?
         $this->assertInstanceOf($this->modelPrefix . $data['name'], $model);
-        $this->assertEquals($data['model_id'], $model->id);
+        $this->assertEquals($data['id'], $model->id);
+        $this->assertEquals($data['model_id'], $model->model_id);
         $this->assertEquals(1, $model->version);
         $this->assertEquals(1, $model->is_current_version);
     }
@@ -71,7 +72,7 @@ class NonIncrementingVersionedTest extends FunctionalTestCase
         $this->assertEquals(1, $model->is_current_version);
 
         // old model exists?
-        $oldModel = $className::onlyOldVersions()->where('id', $data['id'])->first();
+        $oldModel = $className::onlyOldVersions()->first();
         $this->assertInstanceOf($this->modelPrefix . $data['name'], $oldModel);
         $this->assertEquals(1, $oldModel->version);
         $this->assertEquals(0, $oldModel->is_current_version);
@@ -101,7 +102,7 @@ class NonIncrementingVersionedTest extends FunctionalTestCase
         $model->saveMinor();
 
         // model was updated correctly?
-        $this->assertEquals($data['model_id'], $model->id);
+        $this->assertEquals($data['model_id'], $model->model_id);
         $this->assertEquals('Updated ' . $data['name'], $model->name);
         $this->assertEquals(1, $model->version);
         $this->assertEquals(1, $model->is_current_version);

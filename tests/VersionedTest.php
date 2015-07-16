@@ -57,7 +57,7 @@ class VersionedTest extends FunctionalTestCase
         $this->assertEquals(1, $model->is_current_version);
 
         // old model exists?
-        $oldModel = $className::onlyOldVersions()->find(1);
+        $oldModel = $className::onlyOldVersions()->first();
         $this->assertInstanceOf($this->modelPrefix . $data['name'], $oldModel);
         $this->assertEquals(1, $oldModel->version);
         $this->assertEquals(0, $oldModel->is_current_version);
@@ -208,7 +208,7 @@ class VersionedTest extends FunctionalTestCase
         $model->name = 'Updated ' . $data['name'];
         $model->save();
 
-        $originalModel = $className::onlyOldVersions()->find(1);
+        $originalModel = $className::onlyOldVersions()->first();
 
         $changes = (new VersionDiffer)->diff($originalModel, $model);
 
@@ -247,7 +247,6 @@ class VersionedTest extends FunctionalTestCase
                     'doodad_id' => 1
                 )
             ),
-            array(array('name' => 'Doodad', 'widget_id' => 1, 'gadget_id' => 1))
         );
     }
 
