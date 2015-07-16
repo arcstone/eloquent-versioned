@@ -177,6 +177,7 @@ trait Versioned
      */
     public function performVersionedInsert(Builder $query, Model $model)
     {
+        $model->fireModelEvent('creating');
         return $query->insert($model->getAttributes());
     }
 
