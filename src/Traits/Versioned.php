@@ -9,14 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 
 trait Versioned
 {
-
     protected $minorAttributes = [];
 
     protected $isVersioned = true;
 
     protected $hideVersioned = [
         VersionedBuilder::COLUMN_IS_CURRENT_VERSION,
-        VersionedBuilder::COLUMN_MODEL_ID
+        VersionedBuilder::COLUMN_MODEL_ID,
     ];
 
     public static function bootVersioned()
@@ -24,7 +23,7 @@ trait Versioned
         static::addGlobalScope(new VersioningScope());
     }
 
-    protected function getHideVersioned($hide = array())
+    protected function getHideVersioned($hide = [])
     {
         return array_merge($hide, $this->hideVersioned);
     }
@@ -46,11 +45,11 @@ trait Versioned
     /**
      * @return array
      */
-    public function attributesToArray($hide = array())
+    public function attributesToArray($hide = [])
     {
         $parentAttributes = parent::attributesToArray();
 
-        if ((!$this->isVersioned) || ($this->{static::getIsCurrentVersionColumn()} == 0)) {
+        if ((!$this->isVersioned) || ($this->{static::getIsCurrentVersionColumn()} == false)) {
             return $parentAttributes;
         }
 
@@ -72,7 +71,7 @@ trait Versioned
     protected function setKeysForSaveQuery(Builder $query)
     {
         $query->where($this->getKeyName(), '=', $this->getKeyForSaveQuery())
-            ->where($this->getQualifiedIsCurrentVersionColumn(), 1);
+            ->where($this->getQualifiedIsCurrentVersionColumn(), true);
 
         return $query;
     }
@@ -82,7 +81,7 @@ trait Versioned
      *
      * @return mixed
      */
-    public function saveMinor(array $options = array())
+    public function saveMinor(array $options = [])
     {
         return parent::save($options);
     }
@@ -116,41 +115,39 @@ trait Versioned
         // record that is already in this database using the current IDs in this
         // "where" clause to only update this model. Otherwise, we'll just
         // insert them.
-        if ($this->exists) {
-            if ($this->isDirty()) {
-                $saved = $db->transaction(function () use ($query, $db, $options) {
-                    $oldVersion = $this->replicate();
-                    $oldVersion->forceFill($this->original);
-                    $oldVersion->{$this->primaryKey} = null;
-                    $oldVersion->{static::getIsCurrentVersionColumn()} = false;
+        if ($this->exists && $this->isDirty()) {
+            $saved = $db->transaction(function () use ($query, $db, $options) {
+                $oldVersion = $this->replicate(array_merge([$this->getKeyName()], array_keys($this->getNewAttributes())));
+                $oldVersion->forceFill(array_except($this->getOriginal(), $this->getKeyName()));
+                $oldVersion->{static::getIsCurrentVersionColumn()} = false;
 
-                    $this->performVersionedInsert($query, $oldVersion);
+                $this->performVersionedInsert($query, $oldVersion);
 
-                    // trigger the update event
-                    if ($this->fireModelEvent('updating') === false) {
-                        return false;
-                    }
+                // trigger the update event
+                if ($this->fireModelEvent('updating') === false) {
+                    return false;
+                }
 
-                    $this->{static::getVersionColumn()} = static::getNextVersion($this->{static::getModelIdColumn()});
-                    $saved = $this->performUpdate($query, $options);
+                $this->{static::getVersionColumn()} = static::getNextVersion($this->{static::getModelIdColumn()});
 
-                    if ($saved) {
-                        $this->fireModelEvent('updated', false);
-                    }
+                if ($saved = $this->performUpdate($query, $options)) {
+                    $this->fireModelEvent('updated', false);
+                }
 
-                    return $saved;
-                });
-            }
+                return $saved;
+            });
         }
 
         // If the model is brand new, we'll insert it into our database and set the
         // ID attribute on the model to the value of the newly inserted row's ID
         // which is typically an auto-increment value managed by the database.
         else {
-            if($this->{static::getModelIdColumn()} === null) {
+            if ($this->{static::getModelIdColumn()} === null) {
                 $this->{static::getModelIdColumn()} = static::getNextModelId();
             }
-            $saved = $this->performInsert($query, $options);
+            $this->{static::getVersionColumn()}          = 1;
+            $this->{static::getIsCurrentVersionColumn()} = true;
+            $saved                                       = $this->performInsert($query, $options);
         }
 
         if ($saved) {
@@ -178,6 +175,7 @@ trait Versioned
     public function performVersionedInsert(Builder $query, Model $model)
     {
         $model->fireModelEvent('creating');
+
         return $query->insert($model->getAttributes());
     }
 
@@ -276,7 +274,7 @@ trait Versioned
     public static function onlyOldVersions()
     {
         return (new static)->newQueryWithoutScope(new VersioningScope)
-            ->where(static::getQualifiedIsCurrentVersionColumn(), 0);
+            ->where(static::getQualifiedIsCurrentVersionColumn(), false);
     }
 
     /**
@@ -320,5 +318,23 @@ trait Versioned
         }
 
         return true;
+    }
+
+    /**
+     * Get the attributes that have been added since last sync.
+     *
+     * @return array
+     */
+    public function getNewAttributes()
+    {
+        $dirty = [];
+
+        foreach ($this->attributes as $key => $value) {
+            if (!array_key_exists($key, $this->original)) {
+                $dirty[$key] = $value;
+            }
+        }
+
+        return $dirty;
     }
 }

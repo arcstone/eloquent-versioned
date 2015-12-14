@@ -11,7 +11,7 @@ class VersioningScope implements ScopeInterface
 
     public function apply(Builder $builder, Model $model)
     {
-        $builder->where($model->getQualifiedIsCurrentVersionColumn(), 1);
+        $builder->where($model->getQualifiedIsCurrentVersionColumn(), true);
 
         $this->extend($builder);
     }
@@ -20,17 +20,17 @@ class VersioningScope implements ScopeInterface
     {
         $column = $model->getQualifiedIsCurrentVersionColumn();
 
-        $query = $builder->getQuery();
+        $query    = $builder->getQuery();
         $bindings = $query->getBindings();
 
         $bindKey = 0;
 
-        foreach ((array)$query->wheres as $key => $value) {
+        foreach ((array) $query->wheres as $key => $value) {
             if (strtolower($value['type']) == 'basic') {
                 $bindKey++;
             }
             if ($value['column'] == $column) {
-                if ($bindings[$bindKey - 1] == 1) {
+                if ($bindings[$bindKey - 1] == true) {
                     unset($bindings[$bindKey - 1]);
                 }
                 unset($query->wheres[$key]);
@@ -73,8 +73,7 @@ class VersioningScope implements ScopeInterface
             $model = $builder->getModel();
             $this->remove($builder, $model);
 
-            $builder->getQuery()->where($model->getQualifiedIsCurrentVersionColumn(),
-                0);
+            $builder->getQuery()->where($model->getQualifiedIsCurrentVersionColumn(), false);
 
             return $builder;
         });
