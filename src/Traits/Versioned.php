@@ -103,39 +103,38 @@ trait Versioned
 
         $db = $this->getConnection();
 
-        // If the "saving" event returns false we'll bail out of the save and
-        // return false, indicating that the save failed. This provides a chance
-        // for any listeners to cancel save operations if validations fail or
-        // whatever.
+        // If the "saving" event returns false we'll bail out of the save and return
+        // false, indicating that the save failed. This provides a chance for any
+        // listeners to cancel save operations if validations fail or whatever.
         if ($this->fireModelEvent('saving') === false) {
             return false;
         }
 
-        // If the model already exists in the database we can just update our
-        // record that is already in this database using the current IDs in this
-        // "where" clause to only update this model. Otherwise, we'll just
-        // insert them.
-        if ($this->exists && $this->isDirty()) {
-            $saved = $db->transaction(function () use ($query, $db, $options) {
-                $oldVersion = $this->replicate(array_merge([$this->getKeyName()], array_keys($this->getNewAttributes())));
-                $oldVersion->forceFill(array_except($this->getOriginal(), $this->getKeyName()));
-                $oldVersion->{static::getIsCurrentVersionColumn()} = false;
+        // If the model already exists in the database we can just update our record
+        // that is already in this database using the current IDs in this "where"
+        // clause to only update this model. Otherwise, we'll just insert them.
+        if ($this->exists) {
+            if ($this->isDirty()) {
+                $saved = $db->transaction(function () use ($query, $db, $options) {
+                    $oldVersion = $this->replicate(array_merge([$this->getKeyName()], array_keys($this->getNewAttributes())));
+                    $oldVersion->forceFill(array_except($this->getOriginal(), $this->getKeyName()));
+                    $oldVersion->{static::getIsCurrentVersionColumn()} = false;
 
-                $this->performVersionedInsert($query, $oldVersion);
+                    // trigger the update event
+                    if ($this->fireModelEvent('updating') === false) {
+                        return false;
+                    }
 
-                // trigger the update event
-                if ($this->fireModelEvent('updating') === false) {
-                    return false;
-                }
+                    $this->{static::getVersionColumn()} = static::getNextVersion($this->{static::getModelIdColumn()});
 
-                $this->{static::getVersionColumn()} = static::getNextVersion($this->{static::getModelIdColumn()});
+                    if ($saved = $this->performUpdate($query, $options)) {
+                        $this->performVersionedInsert($query, $oldVersion);
+                        $this->fireModelEvent('updated', false);
+                    }
 
-                if ($saved = $this->performUpdate($query, $options)) {
-                    $this->fireModelEvent('updated', false);
-                }
-
-                return $saved;
-            });
+                    return $saved;
+                });
+            }
         }
 
         // If the model is brand new, we'll insert it into our database and set the
